@@ -1037,7 +1037,13 @@ createApp({
       // Auto close toast unless it's a processing state
       if(text && !text.includes('Đang')) setTimeout(()=>{ if(this.notice.text===text) this.notice={type:'',text:''}; }, 5500); 
     },
-    readError(err) { return err?.message || String(err) || 'Có lỗi xảy ra'; },
+    readError(err) {
+      const raw = err?.message || String(err) || 'Có lỗi xảy ra';
+      if (/duplicate key|unique constraint|trùng|already exists/i.test(raw)) {
+        return 'Mã này đã tồn tại trong hệ thống (vi phạm khóa chính). Vui lòng nhập mã khác.';
+      }
+      return raw;
+    },
     async rpcRow(fn,args) { const {data,error} = await this.sb.rpc(fn,args); if(error) throw error; return Array.isArray(data) ? data[0] : data; },
     async rpcRows(fn,args) { const {data,error} = await this.sb.rpc(fn,args); if(error) throw error; return data || []; },
 
@@ -1472,6 +1478,21 @@ createApp({
       try {
         const code = this.editor.form.code.trim().toUpperCase();
         if(!code) throw new Error('Cần nhập mã sản phẩm.');
+
+        // Kiểm tra trùng mã khi thêm mới (không có id): báo lỗi trong app, không dùng alert trình duyệt.
+        if(!this.editor.form.id) {
+          const existing = await this.rpcRows('app_search_catalogue', {
+            p_session_token:this.session.token,
+            p_search:code,
+            p_usage_side:'',
+            p_view_mode:'',
+            p_limit:CONFIG.PAGE_LIMIT,
+            p_offset:0
+          });
+          const dup = existing.find(r => (r.code || '').toUpperCase() === code);
+          if(dup) throw new Error(`Mã "${code}" đã tồn tại trong hệ thống. Vui lòng nhập mã khác.`);
+        }
+
         let assets = this.editor.assets.map(a => ({ asset_type:a.asset_type, storage_provider:a.storage_provider || 'r2', bucket_name:a.bucket_name || 'catalogue-images', image_path:a.image_path, image_name:a.image_name || null, sort_order:Number(a.sort_order||1) }));
 
         for(const [key,file] of Object.entries(this.editor.files)) {
