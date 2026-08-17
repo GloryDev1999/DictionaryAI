@@ -1,0 +1,7 @@
+# Overlay tùy chọn cho profile kim: lái model mặc định sang bản hỗ trợ
+# reasoning effort, dùng khi settings.yaml toàn cục chọn model không hỗ trợ.
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-flash
+    reasoningEffort: high
