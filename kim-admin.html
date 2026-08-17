@@ -1,144 +1,300 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kim v6 — Quản lý Providers</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 <style>
-  body { font-family: system-ui, -apple-system, sans-serif; background: #f8fafc; }
-  .card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-  .btn { padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: .15s; border: none; }
-  .btn-primary { background: #0f172a; color: #fff; }
+  body {
+    background: #f4f6f9;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.2rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .btn-primary {
+    background: #0f172a;
+    color: #fff;
+  }
   .btn-primary:hover { background: #1e293b; }
-  .btn-danger { background: #fee2e2; color: #dc2626; }
+  .btn-primary i { font-size: 1rem; }
+  .btn-success {
+    background: #059669;
+    color: #fff;
+  }
+  .btn-success:hover { background: #047857; }
+  .btn-outline {
+    background: transparent;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+  }
+  .btn-outline:hover { background: #f1f5f9; }
+  .btn-danger {
+    background: #fee2e2;
+    color: #dc2626;
+  }
   .btn-danger:hover { background: #fecaca; }
-  .btn-sm { padding: 4px 12px; font-size: 12px; }
-  input, textarea, select { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 14px; width: 100%; outline: none; }
-  input:focus, textarea:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,.1); }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
-  .badge-active { background: #dcfce7; color: #166534; }
-  .badge-inactive { background: #fee2e2; color: #991b1b; }
-  .toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 10px; color: #fff; font-size: 14px; z-index: 100; animation: fadeIn .3s; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .badge-active {
+    background: #dcfce7;
+    color: #166534;
+  }
+  .badge-inactive {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+  .input,
+  .textarea,
+  .select {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.875rem;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .input:focus,
+  .textarea:focus {
+    border-color: #059669;
+    box-shadow: 0 0 0 3px rgba(5,150,105,0.12);
+  }
+  .label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.02em;
+    margin-bottom: 0.25rem;
+  }
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    padding: 0.8rem 1.5rem;
+    border-radius: 12px;
+    background: #0f172a;
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.875rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    z-index: 999;
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .provider-card {
+    transition: all 0.15s ease;
+  }
+  .provider-card:hover {
+    border-color: #a7f3d0;
+    box-shadow: 0 8px 20px rgba(5,150,105,0.06);
+  }
 </style>
 </head>
-<body class="min-h-screen p-6">
-<div id="app" class="max-w-4xl mx-auto">
-  <div class="flex items-center justify-between mb-6">
+<body class="min-h-screen p-6 flex items-start justify-center">
+<div class="w-full max-w-5xl mx-auto">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-8">
     <div>
-      <h1 class="text-2xl font-bold text-slate-900">⚙️ Kim v6 — Quản lý Providers</h1>
-      <p class="text-sm text-slate-500 mt-1">Cấu hình API providers cho Thư ký Kim. Thay đổi có hiệu lực ngay (cache 5 phút).</p>
+      <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+        <i class="fas fa-sliders-h text-emerald-600"></i>
+        Quản lý Providers
+      </h1>
+      <p class="text-sm text-slate-500 mt-1">Cấu hình các API provider cho Thư ký Kim. Thay đổi có hiệu lực ngay.</p>
     </div>
-    <button class="btn btn-primary" onclick="showAddForm()">+ Thêm Provider</button>
+    <button onclick="showAddForm()" class="btn btn-primary">
+      <i class="fas fa-plus"></i> Thêm Provider
+    </button>
   </div>
 
-  <!-- Token config -->
-  <div class="card p-4 mb-4">
-    <label class="block text-xs font-semibold text-slate-500 mb-1">Admin Token (KIM_ADMIN_TOKEN)</label>
-    <input type="password" id="adminToken" placeholder="Nhập admin token để xác thực API calls" />
+  <!-- Danh sách providers -->
+  <div id="providerList" class="space-y-4">
+    <div class="text-center py-12 text-slate-400 text-sm">
+      <i class="fas fa-spinner fa-spin text-2xl block mb-2"></i>
+      Đang tải...
+    </div>
   </div>
 
-  <!-- Provider list -->
-  <div id="providerList" class="space-y-3">
-    <div class="text-center py-8 text-slate-400">Đang tải...</div>
-  </div>
-
-  <!-- Add/Edit form (hidden by default) -->
-  <div id="providerForm" class="card p-5 mt-4 hidden">
-    <h2 id="formTitle" class="text-lg font-semibold mb-4">Thêm Provider mới</h2>
+  <!-- Form thêm/sửa provider -->
+  <div id="providerForm" class="card p-6 mt-6 hidden">
+    <h2 id="formTitle" class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+      <i class="fas fa-edit text-emerald-600"></i>
+      <span>Thêm Provider mới</span>
+    </h2>
     <input type="hidden" id="editId" />
-    <div class="grid grid-cols-2 gap-3 mb-3">
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">Tên provider</label>
-        <input id="fName" placeholder="vd: xkiro, openai-backup" />
+        <label class="label">Tên provider</label>
+        <input id="fName" class="input" placeholder="ví dụ: xkiro, openai-backup" />
       </div>
       <div>
-        <label class="block text-xs font-semibold text-slate-500 mb-1">Priority (thấp = ưu tiên cao)</label>
-        <input id="fPriority" type="number" value="0" />
+        <label class="label">Priority (số nhỏ ưu tiên cao)</label>
+        <input id="fPriority" type="number" class="input" value="0" />
       </div>
     </div>
-    <div class="mb-3">
-      <label class="block text-xs font-semibold text-slate-500 mb-1">Base URL</label>
-      <input id="fBaseUrl" placeholder="https://api.xkiro.com/v1" />
+
+    <div class="mb-4">
+      <label class="label">Base URL</label>
+      <input id="fBaseUrl" class="input" placeholder="https://api.xkiro.com/v1" />
     </div>
-    <div class="mb-3">
-      <label class="block text-xs font-semibold text-slate-500 mb-1">API Key (plaintext — sẽ được mã hóa trước khi lưu)</label>
-      <input id="fApiKey" type="password" placeholder="sk-..." />
+
+    <div class="mb-4">
+      <label class="label">API Key <span class="text-xs font-normal text-slate-400">(sẽ được mã hóa trước khi lưu)</span></label>
+      <input id="fApiKey" type="password" class="input" placeholder="sk-..." />
     </div>
-    <div class="mb-3">
-      <label class="block text-xs font-semibold text-slate-500 mb-1">Models (JSON array)</label>
-      <textarea id="fModels" rows="6" placeholder='[{"id":"deepseek/deepseek-v4-pro","roles":["orchestrator"]}]'></textarea>
+
+    <div class="mb-4">
+      <label class="label">Models <span class="text-xs font-normal text-slate-400">(JSON array)</span></label>
+      <textarea id="fModels" rows="6" class="textarea" placeholder='[
+  {"id":"deepseek/deepseek-v4-pro","roles":["orchestrator"]},
+  {"id":"xiaomi/mimo-v2.5-pro","roles":["vision"]}
+]'></textarea>
     </div>
-    <div class="flex items-center gap-3 mb-4">
-      <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="fActive" checked class="w-auto" /> Active</label>
+
+    <div class="flex items-center gap-4 mb-4">
+      <label class="flex items-center gap-2 text-sm font-medium text-slate-700">
+        <input type="checkbox" id="fActive" checked class="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500" />
+        Active
+      </label>
     </div>
-    <div class="flex gap-2">
-      <button class="btn btn-primary" onclick="saveProvider()">Lưu</button>
-      <button class="btn" style="background:#f1f5f9" onclick="hideForm()">Hủy</button>
+
+    <div class="flex gap-3">
+      <button onclick="saveProvider()" class="btn btn-success">
+        <i class="fas fa-save"></i> Lưu
+      </button>
+      <button onclick="hideForm()" class="btn btn-outline">
+        <i class="fas fa-times"></i> Hủy
+      </button>
     </div>
   </div>
 </div>
 
 <script>
 const API_BASE = '/api/kim/admin/providers';
+const SESSION_TOKEN_KEY = 'catalogue_app_session_token_v3_r2';
 
-function getToken() { return document.getElementById('adminToken').value.trim(); }
+function getHeaders() {
+  const token = localStorage.getItem(SESSION_TOKEN_KEY);
+  if (token) {
+    return { 'x-session-token': token };
+  }
+  const adminToken = document.getElementById('adminToken')?.value?.trim();
+  if (adminToken) {
+    return { 'x-admin-token': adminToken };
+  }
+  return {};
+}
 
 function toast(msg, ok = true) {
   const el = document.createElement('div');
   el.className = 'toast';
-  el.style.background = ok ? '#166534' : '#dc2626';
-  el.textContent = msg;
+  el.style.background = ok ? '#059669' : '#dc2626';
+  el.innerHTML = msg;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 3000);
 }
 
 async function loadProviders() {
   try {
-    const res = await fetch(API_BASE, { headers: { 'x-admin-token': getToken() } });
+    const headers = getHeaders();
+    const res = await fetch(API_BASE, { headers });
     const data = await res.json();
     if (!data.ok) throw new Error(data.message || 'Load failed');
     renderProviders(data.providers || []);
   } catch (e) {
-    document.getElementById('providerList').innerHTML = `<div class="text-red-500 text-center py-4">Lỗi: ${e.message}</div>`;
+    document.getElementById('providerList').innerHTML = `
+      <div class="text-center py-12 text-red-500">
+        <i class="fas fa-exclamation-circle text-3xl block mb-2"></i>
+        ${e.message}
+      </div>
+    `;
   }
 }
 
 function renderProviders(providers) {
   const container = document.getElementById('providerList');
   if (!providers.length) {
-    container.innerHTML = '<div class="text-center py-8 text-slate-400">Chưa có provider nào. Nhấn "+ Thêm Provider" để bắt đầu.</div>';
+    container.innerHTML = `
+      <div class="text-center py-16 text-slate-400">
+        <i class="fas fa-database text-4xl block mb-3 opacity-30"></i>
+        <p class="text-sm">Chưa có provider nào.</p>
+        <button onclick="showAddForm()" class="btn btn-primary mt-4">
+          <i class="fas fa-plus"></i> Thêm provider đầu tiên
+        </button>
+      </div>
+    `;
     return;
   }
+
   container.innerHTML = providers.map(p => `
-    <div class="card p-4">
-      <div class="flex items-start justify-between">
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="font-semibold text-slate-900">${esc(p.name)}</span>
-            <span class="badge ${p.is_active ? 'badge-active' : 'badge-inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span>
-            <span class="text-xs text-slate-400">priority: ${p.priority}</span>
-          </div>
-          <div class="text-sm text-slate-500 mt-1">${esc(p.base_url)}</div>
-          <div class="text-xs text-slate-400 mt-1">Models: ${(p.models || []).length} · Key: ${p.api_key_masked || '***'}</div>
-          <div class="text-xs text-slate-400 mt-1 flex flex-wrap gap-1">
-            ${(p.models || []).map(m => `<span class="badge" style="background:#f1f5f9;color:#475569">${esc(m.id)} (${(m.roles||[]).join(', ')})</span>`).join('')}
-          </div>
+    <div class="card provider-card p-5 flex flex-wrap items-start justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="font-bold text-slate-800 text-lg">${esc(p.name)}</span>
+          <span class="badge ${p.is_active ? 'badge-active' : 'badge-inactive'}">${p.is_active ? 'Active' : 'Inactive'}</span>
+          <span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">priority ${p.priority}</span>
         </div>
-        <div class="flex gap-1">
-          <button class="btn btn-sm" style="background:#f1f5f9" onclick="editProvider('${p.id}')">Sửa</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteProvider('${p.id}','${esc(p.name)}')">Xóa</button>
+        <div class="text-sm text-slate-500 mt-1 font-mono">${esc(p.base_url)}</div>
+        <div class="text-xs text-slate-400 mt-2 flex flex-wrap items-center gap-1">
+          <span class="bg-slate-100 px-2 py-0.5 rounded">${(p.models || []).length} models</span>
+          <span class="bg-slate-100 px-2 py-0.5 rounded">Key: ${p.api_key_masked || '***'}</span>
         </div>
+        <div class="flex flex-wrap gap-1 mt-2">
+          ${(p.models || []).map(m => `
+            <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded border border-emerald-100">
+              ${esc(m.id)} <span class="text-emerald-400">|</span> ${(m.roles||[]).join(', ')}
+            </span>
+          `).join('')}
+        </div>
+      </div>
+      <div class="flex gap-2 shrink-0">
+        <button onclick="editProvider('${p.id}')" class="btn btn-outline text-sm px-3 py-1.5">
+          <i class="fas fa-pen"></i>
+        </button>
+        <button onclick="deleteProvider('${p.id}','${esc(p.name)}')" class="btn btn-danger text-sm px-3 py-1.5">
+          <i class="fas fa-trash"></i>
+        </button>
       </div>
     </div>
   `).join('');
 }
 
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
 
 function showAddForm() {
-  document.getElementById('formTitle').textContent = 'Thêm Provider mới';
+  document.getElementById('formTitle').innerHTML = '<i class="fas fa-plus-circle text-emerald-600"></i> Thêm Provider mới';
   document.getElementById('editId').value = '';
   document.getElementById('fName').value = '';
   document.getElementById('fBaseUrl').value = 'https://api.xkiro.com/v1';
@@ -147,17 +303,21 @@ function showAddForm() {
   document.getElementById('fPriority').value = '0';
   document.getElementById('fActive').checked = true;
   document.getElementById('providerForm').classList.remove('hidden');
+  document.getElementById('providerForm').scrollIntoView({ behavior: 'smooth' });
 }
 
-function hideForm() { document.getElementById('providerForm').classList.add('hidden'); }
+function hideForm() {
+  document.getElementById('providerForm').classList.add('hidden');
+}
 
 async function editProvider(id) {
   try {
-    const res = await fetch(`${API_BASE}?id=${id}`, { headers: { 'x-admin-token': getToken() } });
+    const headers = getHeaders();
+    const res = await fetch(`${API_BASE}?id=${id}`, { headers });
     const data = await res.json();
     if (!data.ok) throw new Error(data.message);
     const p = data.provider;
-    document.getElementById('formTitle').textContent = 'Sửa Provider: ' + p.name;
+    document.getElementById('formTitle').innerHTML = `<i class="fas fa-edit text-emerald-600"></i> Sửa Provider: ${esc(p.name)}`;
     document.getElementById('editId').value = id;
     document.getElementById('fName').value = p.name;
     document.getElementById('fBaseUrl').value = p.base_url;
@@ -167,13 +327,22 @@ async function editProvider(id) {
     document.getElementById('fPriority').value = p.priority || 0;
     document.getElementById('fActive').checked = p.is_active !== false;
     document.getElementById('providerForm').classList.remove('hidden');
-  } catch (e) { toast(e.message, false); }
+    document.getElementById('providerForm').scrollIntoView({ behavior: 'smooth' });
+  } catch (e) {
+    toast(e.message, false);
+  }
 }
 
 async function saveProvider() {
   const id = document.getElementById('editId').value;
   let models;
-  try { models = JSON.parse(document.getElementById('fModels').value); } catch { toast('Models JSON không hợp lệ', false); return; }
+  try {
+    models = JSON.parse(document.getElementById('fModels').value);
+  } catch {
+    toast('Models JSON không hợp lệ', false);
+    return;
+  }
+
   const body = {
     name: document.getElementById('fName').value.trim(),
     base_url: document.getElementById('fBaseUrl').value.trim(),
@@ -187,30 +356,52 @@ async function saveProvider() {
   try {
     const url = id ? `${API_BASE}/${id}` : API_BASE;
     const method = id ? 'PUT' : 'POST';
+    const headers = getHeaders();
+    headers['content-type'] = 'application/json';
+
     const res = await fetch(url, {
-      method, headers: { 'content-type': 'application/json', 'x-admin-token': getToken() },
+      method,
+      headers,
       body: JSON.stringify(body)
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.message || 'Save failed');
-    toast(id ? 'Đã cập nhật!' : 'Đã thêm!');
+
+    toast(id ? 'Đã cập nhật provider!' : 'Đã thêm provider mới!');
     hideForm();
     loadProviders();
-  } catch (e) { toast(e.message, false); }
+  } catch (e) {
+    toast(e.message, false);
+  }
 }
 
 async function deleteProvider(id, name) {
   if (!confirm(`Xóa provider "${name}"?`)) return;
   try {
-    const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE', headers: { 'x-admin-token': getToken() } });
+    const headers = getHeaders();
+    const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE', headers });
     const data = await res.json();
     if (!data.ok) throw new Error(data.message);
-    toast('Đã xóa!');
+    toast('Đã xóa provider.');
     loadProviders();
-  } catch (e) { toast(e.message, false); }
+  } catch (e) {
+    toast(e.message, false);
+  }
 }
 
-loadProviders();
+// Tự động load khi trang sẵn sàng
+document.addEventListener('DOMContentLoaded', () => {
+  if (!localStorage.getItem(SESSION_TOKEN_KEY)) {
+    document.getElementById('providerList').innerHTML = `
+      <div class="text-center py-12 text-yellow-600">
+        <i class="fas fa-exclamation-triangle text-3xl block mb-2"></i>
+        Bạn chưa đăng nhập. Vui lòng đăng nhập vào hệ thống trước.
+      </div>
+    `;
+  } else {
+    loadProviders();
+  }
+});
 </script>
 </body>
 </html>
