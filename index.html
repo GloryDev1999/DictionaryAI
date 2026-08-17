@@ -306,14 +306,7 @@
           <button @click="openEditor()" v-if="canEdit" class="btn h-11 px-4 sm:px-5 bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-100">
             <i data-lucide="plus" class="w-5 h-5"></i><span class="hide-mobile">Thêm mã mới</span>
           </button>
-          <a
-            v-if="session.user?.role_name === 'admin'"
-            href="/kim-admin.html"
-            class="btn h-11 w-11 sm:w-auto sm:px-4 bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-            title="Cấu hình Kim v6 — Quản lý API Providers"
-          >
-            <i data-lucide="settings" class="w-5 h-5"></i><span class="hide-mobile">Kim Config</span>
-          </a>
+
           <button @click="logout" class="btn h-11 w-11 sm:w-auto sm:px-4 bg-white text-slate-600 border border-slate-200 hover:bg-slate-50">
             <i data-lucide="log-out" class="w-5 h-5"></i><span class="hide-mobile">Thoát</span>
           </button>
@@ -787,12 +780,24 @@
               <h2 class="text-lg font-black text-slate-900">Thư ký Kim</h2>
               <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
             </div>
-            <p class="text-xs font-bold text-slate-500 truncate">Trợ lý tra cứu linh kiện</p>
+            <p class="text-xs font-bold text-slate-500 truncate">Hỏi đáp & tra cứu linh kiện thông minh</p>
           </div>
         </div>
-        <button @click="closeDenis" class="denis-icon-btn shrink-0" aria-label="Đóng Thư ký Kim">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <a
+            v-if="session.user?.role_name === 'admin'"
+            href="/kim-admin.html"
+            target="_blank"
+            class="denis-icon-btn"
+            title="Cấu hình API — Quản lý Providers"
+            aria-label="Cấu hình API"
+          >
+            <i data-lucide="settings" class="w-4 h-4"></i>
+          </a>
+          <button @click="closeDenis" class="denis-icon-btn" aria-label="Đóng Thư ký Kim">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
       </div>
 
     </header>
@@ -857,7 +862,7 @@
           v-model="denis.input"
           @keydown.enter.exact.prevent="sendDenisMessage"
           class="denis-textarea"
-          placeholder="Nhập mã, đặc điểm hoặc gửi ảnh..."
+          placeholder="Hỏi bất kỳ điều gì về linh kiện, hoặc gửi ảnh để tìm kiếm..."
           :disabled="denis.busy"></textarea>
 
         <div class="denis-compose-actions">
@@ -875,7 +880,7 @@
         </div>
       </div>
       <p class="mt-2 px-1 text-[9px] leading-relaxed font-bold text-slate-400">
-        Em chỉ hỗ trợ nội dung liên quan đến catalogue.
+        Thư ký Kim v6 — Hỏi đáp, tra cứu mã hàng, phân tích ảnh linh kiện.
       </p>
     </footer>
   </aside>
@@ -2290,11 +2295,89 @@ createApp({
       this.scrollDenisToBottom();
 
       try {
+        // ── CHẾ ĐỘ 1: Chỉ text (không ảnh) → gọi /api/kim/chat (RAG hỏi đáp) ──
+        if (!imageDataUrl) {
+          this.denis.status = 'Thư ký Kim đang tra cứu dữ liệu...';
+
+          const history = this.denis.messages
+            .filter(m => m.role === 'user' || m.role === 'assistant')
+            .slice(-10)
+            .map(m => ({ role: m.role, content: m.text }));
+
+          const res = await this.fetchWithTimeout(
+            '/api/kim/chat',
+            {
+              method:'POST',
+              headers:{
+                'content-type':'application/json',
+                'x-session-token':this.session.token
+              },
+              body:JSON.stringify({
+                message: userText,
+                session_token: this.session.token,
+                history
+              })
+            },
+            120000
+          );
+
+          const chatData = await res.json().catch(() => ({}));
+          if (queryId !== this.denisSearch.queryId) return;
+
+          if (!res.ok || !chatData?.ok) {
+            // Fallback: thử /api/kim/search nếu chat endpoint chưa bật
+            this.denis.status = 'Em đang tìm trong catalogue...';
+            const fallbackRes = await this.fetchWithTimeout(
+              '/api/kim/search',
+              {
+                method:'POST',
+                headers:{
+                  'content-type':'application/json',
+                  'x-session-token':this.session.token
+                },
+                body:JSON.stringify({
+                  query_id:queryId,
+                  session_token:this.session.token,
+                  message:userText,
+                  image_data_url:null,
+                  query_embedding:null,
+                  query_embeddings:[],
+                  embedding_profile:null,
+                  hints:{ query_vector_source:null },
+                  filters:{ usage_side:this.filters.usage, view_mode:this.filters.viewMode }
+                })
+              },
+              180000
+            );
+            const fallbackData = await fallbackRes.json().catch(() => ({}));
+            if (queryId !== this.denisSearch.queryId) return;
+
+            if (!fallbackRes.ok || fallbackData?.ok === false) {
+              this.denis.messages.push({
+                id:`a-${queryId}`,
+                role:'assistant',
+                text:String(fallbackData?.user_message || 'Xin lỗi anh, em chưa thể xử lý yêu cầu này lúc này.')
+              });
+            } else {
+              this.applyDenisSearchResults(fallbackData);
+            }
+          } else {
+            // Chat thành công — hiển thị câu trả lời
+            this.denis.messages.push({
+              id:`a-${queryId}`,
+              role:'assistant',
+              text: chatData.answer || 'Em chưa tìm được câu trả lời phù hợp.'
+            });
+          }
+          return;
+        }
+
+        // ── CHẾ ĐỘ 2: Có ảnh → pipeline vector search cũ ──
         let queryEmbedding = null;
         let queryEmbeddings = [];
         let embeddingProfile = null;
 
-        if (imageDataUrl && CONFIG.KIM_BROWSER_VECTOR_ENABLED) {
+        if (CONFIG.KIM_BROWSER_VECTOR_ENABLED) {
           this.denis.status = 'Đang khởi tạo nhận dạng hình ảnh...';
 
           const vectorResult = await this.buildKimQueryVector(
@@ -2369,7 +2452,6 @@ createApp({
       } catch (e) {
         if (queryId !== this.denisSearch.queryId) return;
 
-        // Không lộ provider, timeout, Gemini, Gemma hay stack kỹ thuật ra giao diện.
         console.error('Kim UI request failed', e);
 
         this.denis.messages.push({
