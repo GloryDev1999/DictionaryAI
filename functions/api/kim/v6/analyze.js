@@ -82,4 +82,3 @@ function splitDataUrl(dataUrl) {
   return [m[1], m[2]];
 }
 
-</content>

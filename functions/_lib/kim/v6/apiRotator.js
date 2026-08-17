@@ -311,4 +311,3 @@ export async function getRotatorStatus(env) {
   return status;
 }
 
-</content>
