@@ -237,6 +237,63 @@
   .denis-send:disabled{opacity:.5;cursor:not-allowed}
   .denis-preview{margin:0 8px 8px;display:flex;align-items:center;gap:10px;padding:8px;border-radius:13px;background:#f0fdfa;border:1px solid #99f6e4}
   .denis-preview img{width:46px;height:46px;object-fit:cover;border-radius:10px}
+
+  /* ================================================================
+     KIM v6 — Wireframe Streaming Animation + Heatmap
+  ================================================================= */
+  .kim-scan-overlay{
+    position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:12px;
+    background:rgba(15,23,42,.92);backdrop-filter:blur(8px);
+    border-radius:18px;overflow:hidden;
+  }
+  .kim-scan-canvas{width:100%;height:220px;border-radius:12px;overflow:hidden}
+  .kim-scan-progress{width:80%;max-width:280px}
+  .kim-scan-progress-bar{
+    height:6px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden;
+  }
+  .kim-scan-progress-fill{
+    height:100%;border-radius:3px;
+    background:linear-gradient(90deg,#06b6d4,#10b981,#34d399);
+    transition:width .3s ease;
+  }
+  .kim-scan-label{
+    font-size:11px;font-weight:700;color:#94a3b8;text-align:center;margin-top:6px;
+  }
+  .kim-heatmap-wrap{
+    position:relative;width:100%;height:220px;border-radius:12px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .kim-heatmap-wrap img{
+    max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;
+  }
+  .kim-heatmap-canvas{
+    position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease;
+    mix-blend-mode:screen;pointer-events:none;
+  }
+  .kim-heatmap-canvas.visible{opacity:.65}
+  .kim-scan-phase{
+    font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;
+    color:#34d399;margin-bottom:4px;
+  }
+  /* CSS fallback wireframe for mobile */
+  .kim-wireframe-css{
+    width:180px;height:180px;position:relative;
+    transform-style:preserve-3d;
+    animation:kimRotate 4s linear infinite;
+  }
+  .kim-wireframe-css .face{
+    position:absolute;inset:0;border:1.5px solid rgba(52,211,153,.6);
+    background:rgba(16,185,129,.04);
+  }
+  .kim-wireframe-css .face:nth-child(1){transform:rotateY(0deg) translateZ(90px)}
+  .kim-wireframe-css .face:nth-child(2){transform:rotateY(90deg) translateZ(90px)}
+  .kim-wireframe-css .face:nth-child(3){transform:rotateY(180deg) translateZ(90px)}
+  .kim-wireframe-css .face:nth-child(4){transform:rotateY(270deg) translateZ(90px)}
+  .kim-wireframe-css .face:nth-child(5){transform:rotateX(90deg) translateZ(90px)}
+  .kim-wireframe-css .face:nth-child(6){transform:rotateX(-90deg) translateZ(90px)}
+  @keyframes kimRotate{from{transform:rotateX(-20deg) rotateY(0deg)}to{transform:rotateX(-20deg) rotateY(360deg)}}
+
   @media(max-width:640px){
     .denis-launcher{right:12px;bottom:max(12px,env(safe-area-inset-bottom));padding-right:12px}
     .denis-panel{inset:0;width:100%;border-radius:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
@@ -834,6 +891,33 @@
               <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300 ml-auto mt-1"></i>
             </div>
           </button>
+        </div>
+      </div>
+
+      <!-- Kim v6 Scan Animation -->
+      <div v-if="kimScan.active" class="denis-msg assistant" style="max-width:100%">
+        <div class="kim-scan-overlay">
+          <div class="kim-scan-phase">{{ kimScan.phaseLabel }}</div>
+
+          <!-- Phase 1: Wireframe Streaming -->
+          <template v-if="kimScan.phase === 'streaming'">
+            <div class="kim-scan-canvas" ref="kimScanCanvas"></div>
+            <div class="kim-scan-progress">
+              <div class="kim-scan-progress-bar">
+                <div class="kim-scan-progress-fill" :style="{width: kimScan.progress + '%'}"></div>
+              </div>
+              <div class="kim-scan-label">Đang quét điểm mây... {{ kimScan.progress }}%</div>
+            </div>
+          </template>
+
+          <!-- Phase 2: Heatmap Analysis -->
+          <template v-if="kimScan.phase === 'analysis'">
+            <div class="kim-heatmap-wrap">
+              <img :src="kimScan.imageUrl" alt="Ảnh linh kiện" />
+              <canvas ref="kimHeatmapCanvas" class="kim-heatmap-canvas" :class="{visible: kimScan.heatmapVisible}"></canvas>
+            </div>
+            <div class="kim-scan-label">DINOv2 đang phân tích đặc trưng...</div>
+          </template>
         </div>
       </div>
 
@@ -2290,6 +2374,11 @@ createApp({
         ? 'Em đang kiểm tra hình ảnh...'
         : 'Em đang tìm trong catalogue...';
 
+      // Trigger wireframe scan animation for image queries
+      if (imageDataUrl) {
+        this.startKimScanAnimation(imageDataUrl);
+      }
+
       this.clearDenisSearch();
       this.denisSearch.queryId = queryId;
       this.scrollDenisToBottom();
@@ -2443,6 +2532,7 @@ createApp({
           return;
         }
 
+        this.endKimScanAnimation(); // Stop scan animation
         this.applyDenisSearchResults(data);
         this.clearDenisImage();
 
@@ -2454,6 +2544,7 @@ createApp({
 
         console.error('Kim UI request failed', e);
 
+        this.endKimScanAnimation(); // Stop scan animation on error
         this.denis.messages.push({
           id:`a-${queryId}`,
           role:'assistant',
@@ -2469,6 +2560,143 @@ createApp({
 
         this.scrollDenisToBottom();
         this.$nextTick(() => this.renderIcons());
+      }
+    },
+
+    // ─── Kim v6 Scan Animation ───────────────────────────────────────
+    startKimScanAnimation(imageDataUrl) {
+      this.kimScan = { active:true, phase:'streaming', phaseLabel:'STREAMING — Quét 3D', progress:0, imageUrl:imageDataUrl, heatmapVisible:false };
+      this.$nextTick(() => this.initWireframe());
+      // Simulate progress over ~5 seconds
+      const duration = 5000;
+      const start = Date.now();
+      const tick = () => {
+        const elapsed = Date.now() - start;
+        const pct = Math.min(100, Math.round((elapsed / duration) * 100));
+        this.kimScan.progress = pct;
+        if (pct < 100) {
+          this._kimScanTimer = requestAnimationFrame(tick);
+        } else {
+          this.transitionToHeatmap();
+        }
+      };
+      this._kimScanTimer = requestAnimationFrame(tick);
+    },
+
+    initWireframe() {
+      const container = this.$refs.kimScanCanvas;
+      if (!container) return;
+      const isMobile = window.innerWidth < 768;
+
+      if (isMobile) {
+        // CSS fallback: rotating wireframe cube
+        container.innerHTML = '<div class="kim-wireframe-css"><div class="face"></div><div class="face"></div><div class="face"></div><div class="face"></div><div class="face"></div><div class="face"></div></div>';
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.justifyContent = 'center';
+        return;
+      }
+
+      // Desktop: Three.js wireframe
+      try {
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+        camera.position.set(0, 1.5, 4);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ alpha:true, antialias:true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setClearColor(0x000000, 0);
+        container.innerHTML = '';
+        container.appendChild(renderer.domElement);
+
+        // Create wireframe icosahedron (looks like industrial part scan)
+        const geo = new THREE.IcosahedronGeometry(1.5, 2);
+        const mat = new THREE.MeshBasicMaterial({ color:0x34d399, wireframe:true, transparent:true, opacity:0.7 });
+        const mesh = new THREE.Mesh(geo, mat);
+        scene.add(mesh);
+
+        // Add grid
+        const grid = new THREE.GridHelper(6, 20, 0x06b6d4, 0x1e3a5f);
+        grid.position.y = -1.8;
+        scene.add(grid);
+
+        this._kimThree = { scene, camera, renderer, mesh, container };
+        const animate = () => {
+          if (!this.kimScan.active || this.kimScan.phase !== 'streaming') return;
+          mesh.rotation.y += 0.008;
+          mesh.rotation.x += 0.003;
+          renderer.render(scene, camera);
+          this._kimThreeRAF = requestAnimationFrame(animate);
+        };
+        animate();
+      } catch(e) {
+        // WebGL failed, fallback to CSS
+        container.innerHTML = '<div class="kim-wireframe-css"><div class="face"></div><div class="face"></div><div class="face"></div><div class="face"></div><div class="face"></div><div class="face"></div></div>';
+        container.style.display = 'flex';
+        container.style.alignItems = 'center';
+        container.style.justifyContent = 'center';
+      }
+    },
+
+    transitionToHeatmap() {
+      // Freeze wireframe
+      if (this._kimThreeRAF) cancelAnimationFrame(this._kimThreeRAF);
+      this.kimScan.phase = 'analysis';
+      this.kimScan.phaseLabel = 'ANALYSIS — DINOv2 Heatmap';
+
+      this.$nextTick(() => {
+        this.renderHeatmap();
+        // Show heatmap after brief delay
+        setTimeout(() => { this.kimScan.heatmapVisible = true; }, 400);
+        // End animation after 2.5s of heatmap display
+        setTimeout(() => { this.endKimScanAnimation(); }, 2500);
+      });
+    },
+
+    renderHeatmap() {
+      const canvas = this.$refs.kimHeatmapCanvas;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.parentElement.clientWidth;
+      const h = canvas.parentElement.clientHeight;
+      canvas.width = w;
+      canvas.height = h;
+
+      // Simulate DINOv2 attention with radial gradients (hot spots)
+      ctx.clearRect(0, 0, w, h);
+
+      // Generate 4-6 random hot spots (simulating attention on holes/edges)
+      const spots = 4 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < spots; i++) {
+        const x = w * (0.2 + Math.random() * 0.6);
+        const y = h * (0.2 + Math.random() * 0.6);
+        const r = 20 + Math.random() * 40;
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+        grad.addColorStop(0, 'rgba(255,60,60,0.8)');   // Hot red center
+        grad.addColorStop(0.4, 'rgba(255,165,0,0.5)'); // Orange
+        grad.addColorStop(0.7, 'rgba(0,180,255,0.3)'); // Blue
+        grad.addColorStop(1, 'rgba(0,0,80,0)');        // Transparent cold
+        ctx.fillStyle = grad;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+
+      // Add subtle blue overlay for "cold" areas
+      ctx.fillStyle = 'rgba(30,60,180,0.12)';
+      ctx.fillRect(0, 0, w, h);
+    },
+
+    endKimScanAnimation() {
+      if (this._kimScanTimer) cancelAnimationFrame(this._kimScanTimer);
+      if (this._kimThreeRAF) cancelAnimationFrame(this._kimThreeRAF);
+      this.kimScan.active = false;
+      this.kimScan.phase = '';
+      this.kimScan.progress = 0;
+      this.kimScan.heatmapVisible = false;
+      // Cleanup Three.js
+      if (this._kimThree) {
+        this._kimThree.renderer.dispose();
+        this._kimThree = null;
       }
     },
 
