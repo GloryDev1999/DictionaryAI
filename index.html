@@ -911,6 +911,12 @@ const CONFIG = {
   LOCAL_TOKEN_KEY: 'catalogue_app_session_token_v3_r2',
   PAGE_LIMIT: 36,
 
+  // Auto-login (chế độ prototype): vào thẳng hệ thống, bỏ qua màn hình đăng nhập.
+  // Nếu đăng nhập tự động thất bại sẽ quay lại form đăng nhập thủ công.
+  AUTO_LOGIN_ENABLED: true,
+  AUTO_LOGIN_USERNAME: 'Vinh',
+  AUTO_LOGIN_PASSWORD: '123',
+
   // Thư ký Kim V5.5 — Browser DINOv2
   KIM_BROWSER_VECTOR_ENABLED: true,
   KIM_BROWSER_VECTOR_MODULE_URL: '/src/kim/vector/browserDinov2.js',
@@ -1056,7 +1062,12 @@ createApp({
     async rpcRows(fn,args) { const {data,error} = await this.sb.rpc(fn,args); if(error) throw error; return data || []; },
 
     async checkSession() {
-      if (!this.session.token) return;
+      if (!this.session.token) {
+        if (CONFIG.AUTO_LOGIN_ENABLED && CONFIG.AUTO_LOGIN_USERNAME) {
+          await this.autoLogin();
+        }
+        return;
+      }
       try {
         const me = await this.rpcRow('app_me', {p_session_token:this.session.token});
         if (!me?.ok) throw new Error(me?.message || 'Session hết hạn');
@@ -1081,6 +1092,22 @@ createApp({
         await this.checkSession();
         this.toast('success','Đăng nhập thành công.');
       } catch(e) { this.toast('error', this.readError(e)); } finally { this.loading=false; }
+    },
+    async autoLogin() {
+      try {
+        const row = await this.rpcRow('app_login', {
+          p_username: CONFIG.AUTO_LOGIN_USERNAME,
+          p_password: CONFIG.AUTO_LOGIN_PASSWORD
+        });
+        if (!row?.ok || !row?.session_token) return; // Thất bại → hiện form đăng nhập thủ công
+        this.session.token = row.session_token;
+        localStorage.setItem(CONFIG.LOCAL_TOKEN_KEY, row.session_token);
+        await this.checkSession(); // Luồng chuẩn: app_me + loadParts + retry vector queue
+      } catch (_) {
+        localStorage.removeItem(CONFIG.LOCAL_TOKEN_KEY);
+        this.session.token = '';
+        this.session.user = null; // Hiện form đăng nhập thủ công
+      }
     },
     async logout() {
       try { if(this.session.token) await this.rpcRow('app_logout', {p_session_token:this.session.token}); } catch(_) {}
