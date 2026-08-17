@@ -1,0 +1,21 @@
+{
+  "name": "dsh-plugin-kim",
+  "version": "0.1.0",
+  "description": "Thư ký Kim chạy trên DeepSeek Harness: bộ tool quản lý vector base (Supabase pgvector) và đọc hiểu ảnh cho DictionaryAI.",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./package.json": "./package.json"
+  },
+  "keywords": ["dsh-plugin"],
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*",
+    "@deepseek-ai/dsh-tools": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": { "optional": true },
+    "@deepseek-ai/dsh-tools": { "optional": true }
+  }
+}
