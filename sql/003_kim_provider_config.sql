@@ -42,8 +42,10 @@ values (
   'https://api.xkiro.com/v1',
   'PLACEHOLDER_ENCRYPTED_KEY',
   '[
+    {"id":"qwen/qwen3.8-max","roles":["orchestrator","synthesizer"]},
     {"id":"deepseek/deepseek-v4-pro","roles":["orchestrator"]},
     {"id":"xiaomi/mimo-v2.5-pro","roles":["vision"]},
+    {"id":"qwen/qwen3-vl-plus","roles":["vision"]},
     {"id":"mistralai/mistral-medium-3.5","roles":["synthesizer"]},
     {"id":"deepseek/deepseek-v4-flash","roles":["fallback","lightweight"]},
     {"id":"mistralai/mistral-large-2512","roles":["fallback"]},
