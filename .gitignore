@@ -1,0 +1,5 @@
+
+# Environment files with secrets
+.env
+*.env.local
+kim-harness/.env
