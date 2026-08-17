@@ -14,7 +14,7 @@ import { json, readJson } from "../../_lib/shared/http.js";
 import { callJson } from "../../_lib/kim/v6/apiRotator.js";
 
 // Reuse existing Supabase RPC helpers from Kim v5
-import { rpcAnon } from "../../_lib/kim/v5/connectors/supabase.js";
+import { rpc } from "../../_lib/kim/v5/connectors/supabase.js";
 
 export async function onRequestPost({ request, env }) {
   const enabled = /^(1|true|yes|on)$/i.test(String(env.KIM_V6_ENABLED || ""));
@@ -77,7 +77,7 @@ export async function onRequestPost({ request, env }) {
     let vectorNeighbors = [];
     if (Array.isArray(queryEmbedding) && queryEmbedding.length > 0) {
       try {
-        const rows = await rpcAnon(
+        const rows = await rpc(
           env,
           "match_catalogue_image_vectors",
           {
