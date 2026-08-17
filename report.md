@@ -163,3 +163,139 @@ Client encode ảnh (DINOv2 worker) ──► POST /api/kim/search {message, que
   → còn mơ hồ? ──yes──► Gemma judge → KIM_VECTOR_GEMINI_GEMMA
   → trả ≤5 candidate + warnings + ai_calls budget
 ```
+
+---
+
+## 13. Kim v6 — Harness trên nền DeepSeek Harness (NÂNG CẤP)
+
+### 13.1 Tổng quan
+
+Kim v6 là thế hệ mới của Thư ký Kim, chạy trên **DeepSeek Harness (DSH)** thay vì Cloudflare Workers. Kiến trúc chuyển từ monolithic orchestrator sang **4-tier pipeline** với **API Rotator** hỗ trợ đa provider, tự động xoay vòng khi hết quota, không khóa cứng endpoint.
+
+| Đặc điểm | Kim v5 | Kim v6 |
+|---|---|---|
+| Runtime | Cloudflare Pages Functions | DSH headless (Node.js) |
+| LLM providers | Gemini + OpenRouter (cố định) | Đa provider qua API Rotator |
+| Pipeline | Monolithic orchestrator | 4 tầng độc lập |
+| Xoay vòng API | Không có | Tự động cooldown + fallback |
+| Metadata Synthesizer | Không có | Vector neighbors → refined features |
+| Orchestrator reasoning | Gemini/Gemma (cố định) | Bất kỳ reasoning model nào |
+| Triển khai | Deploy cùng CF Pages | VPS riêng / bridge HTTP |
+
+### 13.2 Kiến trúc 4-Tier Pipeline
+
+```
+Ảnh input
+   │
+   ▼
+┌──────────────────────────────┐
+│ TẦNG 1: Vision Analyst       │  Tool: kim_image_describe
+│ Model vision (mimo-v2.5-pro) │  Output: JSON đặc điểm cấu trúc
+│ Fallback: gemini-3.5-flash   │
+└──────────────┬───────────────┘
+               ▼
+┌──────────────────────────────┐
+│ TẦNG 2: Vector Encoder       │  Tool: kim_vector_search
+│ DINOv2-small 384d (giữ nguyên)│  Output: Top-K candidates từ pgvector
+│ pgvector HNSW cosine search  │
+└──────────────┬───────────────┘
+               ▼
+┌──────────────────────────────┐
+│ TẦNG 3: Metadata Synthesizer │  Tool: kim_synthesize
+│ Model lightweight            │  Input: Vision JSON + Neighbors metadata
+│ (mistral-medium-3.5)         │  Output: Refined features + conflict detection
+└──────────────┬───────────────┘
+               ▼
+┌──────────────────────────────┐
+│ TẦNG 4: Orchestrator/Reranker│  Tool: kim_rerank
+│ Reasoning model              │  Input: Query + Vision + Synthesis + Candidates
+│ (deepseek-v4-pro)            │  Output: Top 5 ranked + match_reason
+└──────────────────────────────┘
+```
+
+### 13.3 API Rotator (lib/apiRotator.mjs)
+
+Engine xoay vòng đa provider, đọc config từ env `KIM_PROVIDERS` (JSON array):
+
+- **Selection**: chọn model tốt nhất cho role, ưu tiên non-cooldown rồi role match rồi fallback
+- **Cooldown**: 429 theo Retry-After hoặc 60s mặc định; 402/403 cooldown 5 phút
+- **Retry**: tối đa 3 attempts, tự động chuyển provider/model tiếp theo
+- **Streaming**: passthrough SSE từ bất kỳ provider nào
+- **Status**: tool kim_rotator_status để debug trạng thái rotation
+
+Phân bổ model gợi ý (7 model xkiro):
+
+| Role | Primary | Fallback 1 | Fallback 2 |
+|---|---|---|---|
+| Vision | xiaomi/mimo-v2.5-pro | qwen/qwen3-vl-plus | gemini-3.5-flash |
+| Orchestrator | deepseek/deepseek-v4-pro | mistral-large-2512 | deepseek-v4-flash |
+| Synthesizer | mistralai/mistral-medium-3.5 | minimax/minimax-m2.7 | deepseek-v4-flash |
+| Lightweight | minimax/minimax-m2.7 | ministral-3b | glm-4.5-air |
+
+### 13.4 Bộ 9 Tools
+
+| Tool | Tầng | Chức năng chính |
+|---|---|---|
+| kim_image_describe | Vision Analyst | Phân tích ảnh ra đặc điểm cấu trúc JSON |
+| kim_vector_search | Vector Encoder | DINOv2 encode rồi pgvector search ra candidates |
+| kim_synthesize | Metadata Synthesizer | Vision + neighbors ra refined features |
+| kim_rerank | Orchestrator | Reasoning rerank ra Top 5 chính xác nhất |
+| kim_catalogue_search | Text | Tìm metadata catalogue theo text |
+| kim_image_fetch | Media | Nạp và kiểm tra ảnh từ media proxy |
+| kim_vector_upsert | Admin | Upsert embedding vào vector base |
+| kim_vector_lifecycle | Admin | Bật tắt vector trong base |
+| kim_rotator_status | Debug | Xem trạng thái API rotation |
+
+### 13.5 Tích hợp DictionaryAI
+
+Kim v6 chạy độc lập trên VPS, kết nối DictionaryAI qua bridge HTTP:
+
+```
+DictionaryAI (CF Pages)                    VPS (Kim v6)
++---------------------+                   +---------------------+
+| Frontend (Vue 3)    |                   | dsh --profile kim   |
+|   |                 |                   |   (headless agent)  |
+| /api/kim/search-dsh |--HTTP POST------>| bridge/server.mjs   |
+| (feature flag)      |<--JSON response--|   :3090             |
+|                     |                   |                     |
+| Fallback:           |                   | Tools goi:          |
+| /api/kim/search     |                   |  - Supabase RPC     |
+| (Kim v5 cu)         |                   |  - DINOv2 endpoint  |
+|                     |                   |  - API Rotator      |
++---------------------+                   +---------------------+
+```
+
+Kích hoạt: set KIM_DSH_PROXY_ENABLED=true và KIM_DSH_BRIDGE_URL trên CF Pages.
+
+### 13.6 Điểm mạnh so với Kim v5
+
+1. Không khóa cứng API: thêm provider mới chỉ cần append JSON, không sửa code
+2. Tự phục hồi: rate limit auto-rotate cooldown retry, không bao giờ chết cứng
+3. Metadata Synthesizer: tầng mới giúp phân biệt mã giống nhau 95% bằng cách tổng hợp evidence từ vector neighbors
+4. Reasoning orchestrator: dùng model reasoning mạnh (deepseek-v4-pro) thay vì chỉ Gemini/Gemma
+5. Chạy độc lập: không phụ thuộc Cloudflare Workers CPU/memory limits
+6. Giữ nguyên vector base: DINOv2 profile cls_l2_v1 không đổi, tương thích ngược hoàn toàn
+
+### 13.7 Cấu trúc file Kim v6
+
+```
+kim-harness/
+  package.json              Plugin DSH dsh-plugin-kim
+  index.mjs                 Dang ky 9 tools vao ctx.tools
+  lib/
+    apiRotator.mjs          Multi-provider rotation engine
+    image.mjs               Vision/Synthesizer/Orchestrator implementations
+    supabase.mjs            Supabase RPC connector
+    vectorProfile.mjs       DINOv2 profile config
+  bridge/
+    server.mjs              HTTP bridge (spawn dsh headless)
+  .env.kim.example          Mau bien moi truong
+  DEPLOY.md                 Huong dan trien khai chi tiet
+  kim.overlay.yml           Overlay tuy chon
+```
+
+### 13.8 Tài liệu liên quan
+
+- hdsd.md: Hướng dẫn sử dụng cho người vận hành
+- kim-harness/DEPLOY.md: Hướng dẫn triển khai kỹ thuật
+- kim-harness/.env.kim.example: Mẫu cấu hình đầy đủ
